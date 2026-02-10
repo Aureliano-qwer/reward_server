@@ -13,7 +13,7 @@ class ScorerService:
     _active_requests = 0
 
     def __init__(self):
-        self.fmt_reward = FormatReward()
+        # self.fmt_reward = FormatReward()
         self.acc_reward = AccuracyReward()
         self.llm_reward = GptOssJudgeReward() # QwenJudgeReward()
         self.legacy_rule = LegacyRuleReward()
@@ -45,64 +45,53 @@ class ScorerService:
             # [调试代码] 打印接收到的 data_source
             # ------------------------------------------------------------------
             # print(f"DEBUG: data_source received: '{req.data_source}'")
-            
-            # 逻辑判断
-            use_model_judge = True
 
             details = {}
             final_score = 0.0
             reason = "rule_based"
-
-            if use_model_judge:
-                # === 场景 A: 调用 LLM ===
-                # logger.info(f"[{req_id}] 正在调用 LLM Judge...")
                 
-                # [DEBUG] 记录 vLLM 推理耗时
-                t_llm_start = time.time()
-                
-                # 关键点：这里是 await，让出控制权。
-                # 如果 vLLM 是并行的，这里应该会有多个请求同时处于 await 状态。
-                score = await self.llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
-                
-                t_llm_cost = time.time() - t_llm_start
-                
-                # [DEBUG] 打印单次推理耗时
-                logger.info(f"🤖 [Req {req_id}] LLM Finish | Cost: {t_llm_cost:.4f}s | Score: {score}")
-
-                final_score = score
-                reason = "llm_judge"
-                details["judge"] = score
-                details["format"] = await self.fmt_reward.compute("", req.response_str, "")
+            # logger.info(f"[{req_id}] 正在调用 LLM Judge...")
             
-            else:
-                # === 场景 B: 规则打分 ===
-                t_rule_start = time.time()
-                
-                fmt_task = self.fmt_reward.compute("", req.response_str, "")
-                
-                # 修正变量名 extra_info_dict 防止报错
-                extra_info_dict = extra_info if isinstance(extra_info, dict) else {}
-                
-                rule_score_task = self.legacy_rule.compute(
-                    prompt=req.prompt_str,
-                    response=req.response_str,
-                    ground_truth=ground_truth_str,
-                    extra_info=extra_info_dict
-                )
+            # [DEBUG] 记录 vLLM 推理耗时
+            t_llm_start = time.time()
+            
+            # 关键点：这里是 await，让出控制权。
+            # 如果 vLLM 是并行的，这里应该会有多个请求同时处于 await 状态。
+            score = await self.llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
+            
+            t_llm_cost = time.time() - t_llm_start
+            
+            # [DEBUG] 打印单次推理耗时
+            logger.info(f"🤖 [Req {req_id}] LLM Finish | Cost: {t_llm_cost:.4f}s | Score: {score}")
 
-                fmt_score, rule_score = await asyncio.gather(fmt_task, rule_score_task)
-                
-                if fmt_score < 1.0:
-                    final_score = 0.0
-                    reason = "format_error"
-                else:
-                    final_score = rule_score
-                    reason = "accuracy_check"
-                    
-                details["format_score"] = fmt_score
-                details["rule_score"] = rule_score
-                
-                logger.info(f"📏 [Req {req_id}] Rule Finish | Cost: {time.time() - t_rule_start:.4f}s")
+            details["llm_judge"] = score
+            # details["format"] = await self.fmt_reward.compute("", req.response_str, "")
+            
+            t_rule_start = time.time()
+            extra_info_dict = extra_info if isinstance(extra_info, dict) else {}
+            
+            # 1. 创建 Task (Coroutine)
+            rule_score_task = self.legacy_rule.compute(
+                prompt=req.prompt_str,
+                response=req.response_str,
+                ground_truth=ground_truth_str,
+                extra_info=extra_info_dict
+            )
+
+            # 2. 等待结果 (只接收一个返回值！)
+            rule_score = await rule_score_task
+            
+            # 3. 如果你需要 fmt_score 用于兼容旧逻辑，可以手动设为 1.0 或 0.0
+            # fmt_score = 1.0 
+
+            # 4. 计算总分
+            final_score = rule_score * score
+            reason = "LLM * Rule"
+            
+            details["rule_score"] = rule_score
+            details["final_score"] = final_score
+            
+            logger.info(f"📏 [Req {req_id}] Rule Finish | Cost: {time.time() - t_rule_start:.4f}s | Final Score: {final_score}")
 
             # 返回扁平结构
             return RewardResponse(
