@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # 模型配置
     MODEL_PATH: str = "openai/gpt-oss-120b"
     GPU_MEMORY_UTILIZATION: float = 0.9
-    TENSOR_PARALLEL_SIZE: int = 4
+    TENSOR_PARALLEL_SIZE: int = 8
     MAX_MODEL_LEN: int = 32768
 
     class Config:

@@ -19,5 +19,5 @@ class RewardResponse(BaseModel):
     score: float       
     
     # 其他信息会作为 res 返回给 Client 的 detail
-    details: Dict[str, float] = {}
+    details: Dict[str, Any] = {}
     reason: str = ""

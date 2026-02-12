@@ -84,7 +84,7 @@ def build_prompt(system_prompt, user_prompt, enable_think, name) -> str:
             return f'''<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.
 Knowledge cutoff: 2024-06
 Current date: 2025-10-31
-Reasoning: low
+Reasoning: medium
 # Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|><|start|>user<|message|>{system_prompt}\n\n{user_prompt}<|end|><|start|>assistant<|channel|>analysis<|message|>'''
         else:
             return f"{user_message_formatted}<|start|>assistant<|channel|>analysis<|message|><|end|><|start|>assistant<|channel|>final<|message|>" # 忽略system_prompt
@@ -188,7 +188,7 @@ The student correctly identified that the code fails, agreeing with the Ground T
         # 4. 采样参数 (适度思考)
         sampling_params = SamplingParams(
             temperature=0.2,       # 稍微给一点温度，让思维链自然展开，但保持收敛
-            max_tokens=4096,       # 既然允许思考，给 1024 token 足够它写一段简短分析 + 结果
+            max_tokens=8192,       # 既然允许思考，给 4096 token 足够它写一段简短分析 + 结果
             stop=["<|end|>"]       # 只要模型输出结束符就停
         )
         
@@ -216,7 +216,7 @@ The student correctly identified that the code fails, agreeing with the Ground T
                 print(f"Generated Content (Last 200 chars): ...{final_output[-200:]!r}")
                 print(f"{'='*60}\n")
                 # 这种情况下通常无法提取分数，直接返回 0.0 是对的，但我们需要知道原因
-                return 0.0
+                return 0.0, final_output
 
             # 6. 结果解析
             # 模型现在的输出会包含：
@@ -224,14 +224,14 @@ The student correctly identified that the code fails, agreeing with the Ground T
             # 所以只要在整个字符串里找 [[1]] 即可
             
             if "[[1]]" in final_output:
-                return 1.0
+                return 1.0, final_output
             elif "[[0]]" in final_output:
-                return 0.0
+                return 0.0, final_output
             
             # [调试] 如果不是截断，但依然没找到标签，打印出来看看它到底说了啥
             print(f"⚠️ [Format Error] Output finished normally but no tag found. Content: {raw_text[:100]}...")
-            return 0.0
+            return 0.0, final_output
 
         except Exception as e:
             print(f"ERROR in GptOssJudgeReward: {e}")
-            return 0.0
+            return 0.0, f"Error: {str(e)}"

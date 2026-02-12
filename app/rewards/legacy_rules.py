@@ -2,7 +2,54 @@
 # ... (把你上面的所有 import 和 def 函数都贴在这里) ...
 
 from app.rewards.base import BaseReward
+import re
+import json
 
+
+# ================= 配置区域 (方便调整权重) =================
+WEIGHT_VERDICT_CORRECT = 1.0   # 结论正确的得分
+WEIGHT_ERROR_TP = 1.0          # 猜对一个错误类型的得分
+WEIGHT_ERROR_FP = -1.0         # 猜错扣分
+MIN_ERROR_SCORE = 0.0          # 错误分析最低分
+SCORE_CONSOLATION = 0.5        # 【新增】安慰分：当GT无具体错误信息但结论为Failed时，只要预测了错误就给半分
+# ==========================================================
+
+
+
+# ==========================================================
+# 严格模式打分器 (用于 Test/Validation 集)
+# ==========================================================
+class StrictRuleReward(BaseReward):
+    """
+    Test 模式专用：只关心结论 (Verdict) 是否正确。
+    忽略具体的错误类型分析，计算速度极快。
+    """
+    async def compute(self, prompt: str, response: str, ground_truth: str, extra_info: dict = None) -> float:
+        # 0. 基础检查
+        if not response:
+            return 0.0
+
+        # 1. 提取思考后的内容 (防止 <think> 里的内容干扰)
+        if "</think>" in response:
+            answer_content = response.split("</think>")[-1]
+        else:
+            answer_content = response
+
+        # 2. 直接调用现有的 verdict 判断逻辑
+        # get_verdict_score 只会返回 1.0 (正确) 或 0.0 (错误)
+        try:
+            score = get_verdict_score(answer_content, ground_truth)
+        except Exception as e:
+            # 记录日志或静默失败
+            print(f"[StrictRule] Verdict check failed: {e}")
+            score = 0.0
+
+        return float(score)
+
+
+# ==========================================================
+# 训练过程的规则打分器 (用于训练集)
+# ==========================================================
 class LegacyRuleReward(BaseReward):
     """
     适配器模式：将旧的 compute_score 逻辑封装为新框架的组件
@@ -25,16 +72,6 @@ class LegacyRuleReward(BaseReward):
         return float(score)
 
 
-import re
-import json
-
-# ================= 配置区域 (方便调整权重) =================
-WEIGHT_VERDICT_CORRECT = 1.0   # 结论正确的得分
-WEIGHT_ERROR_TP = 1.0          # 猜对一个错误类型的得分
-WEIGHT_ERROR_FP = -1.0         # 猜错扣分
-MIN_ERROR_SCORE = 0.0          # 错误分析最低分
-SCORE_CONSOLATION = 0.5        # 【新增】安慰分：当GT无具体错误信息但结论为Failed时，只要预测了错误就给半分
-# ==========================================================
 
 def compute_score(data_source, solution_str, ground_truth, extra_info):
     """

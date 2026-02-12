@@ -1,6 +1,6 @@
 sudo chmod -R +x /mnt/shared-storage-user/ailab-llmkernel/yangkaichen/Code_judgement/reward_server/launch_reward_api.sh
 rjob submit --name=ykc-reward-api \
---gpu=4 \
+--gpu=8 \
 --memory=512000 \
 --cpu=64 \
 --charged-group=llmkernel_gpu \
