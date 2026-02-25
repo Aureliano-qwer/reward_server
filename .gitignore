@@ -1,3 +1,4 @@
 logs/
 data/
 *.pyc
+launch_reward_api_rjob.sh

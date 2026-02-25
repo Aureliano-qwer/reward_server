@@ -1,5 +1,5 @@
 sudo chmod -R +x /mnt/shared-storage-user/ailab-llmkernel/yangkaichen/Code_judgement/reward_server/launch_reward_api.sh
-rjob submit --name=ykc-reward-api \
+rjob submit --name=ykc-reward-api-5score-prompt_v7-filllm \
 --gpu=8 \
 --memory=512000 \
 --cpu=64 \

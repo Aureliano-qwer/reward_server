@@ -8,13 +8,13 @@ from dataclasses import dataclass
 
 # ================= 配置区域 =================
 # 务必确认端口号！之前日志里是 23334，这里写的是 23334，请确保一致
-TARGET_URL = "http://100.98.32.90:23334/compute_score"
+TARGET_URL = "http://10.103.26.49:23334/compute_score"
 
 # 并发数
 CONCURRENCY = 200
 
 # 总请求数
-TOTAL_REQUESTS = 2000
+TOTAL_REQUESTS = 200
 
 # 基础 Payload 模板
 PAYLOAD_TEMPLATE = {

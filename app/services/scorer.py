@@ -108,6 +108,10 @@ class ScorerService:
                 # 关键点：这里是 await，让出控制权。
                 # 如果 vLLM 是并行的，这里应该会有多个请求同时处于 await 状态。
                 score, reasoning = await self.llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
+
+
+                # TODO：加个负分机制
+                # score = score - 0.5
                 
                 t_llm_cost = time.time() - t_llm_start
                 
@@ -141,7 +145,8 @@ class ScorerService:
                 # 4. 计算总分 (混合分 - 加权求和)
                 weight_rule = 0.4
                 weight_llm = 0.6
-                final_score = (rule_score * weight_rule) + (score * weight_llm)
+                # final_score = (rule_score * weight_rule) + (score * weight_llm)
+                final_score = score
                 reason = "LLM + Rule"  # <--- [微调] 名字改成加号，符合现在逻辑
                 
                 details["rule_score"] = rule_score
