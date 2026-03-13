@@ -1,15 +1,21 @@
 #!/bin/bash
 # ============================================================
 # 启动 Universal Reward Model Service (URMS)
-# 集成 vLLM In-Process 推理 (Qwen3-8B)
+# 集成 vLLM 或 SGLang In-Process 推理
 # 绑定到 0.0.0.0，默认端口 6009
+#
+# 推理框架切换（环境变量，默认 vllm）:
+#   export INFERENCE_BACKEND=vllm   # 使用 vLLM (默认)
+#   export INFERENCE_BACKEND=sglang # 使用 SGLang (需安装 sglang)
 # ============================================================
 
 # 1. 配置区域 (请根据实际情况修改)
 # ------------------------------------------------------------
 # 指定使用的 GPU ID (例如 "0" 或 "0,1")
 
-export HF_HUB_CACHE=/mnt/shared-storage-user/large-model-center-share-weights/hf_hub/
+export INFERENCE_BACKEND=sglang
+
+export HF_HUB_CACHE=/mnt/shared-storage-gpfs2/gpfs2-shared-public/huggingface/hub/
 export HF_HUB_OFFLINE=1
 export VLLM_USE_MODELSCOPE=0
 export VLLM_USE_HARMONY=0
@@ -20,7 +26,8 @@ PROJECT_ROOT="/mnt/shared-storage-user/ailab-llmkernel/yangkaichen/Code_judgemen
 
 # Conda 环境路径 (请修改为你创建的 reward_server 环境路径)
 # 如果不确定，可以用 'conda env list' 查看
-CONDA_ENV_PATH="/mnt/shared-storage-user/ailab-llmkernel/huangzixian/miniconda3/envs/ykc-codejudge" 
+# CONDA_ENV_PATH="/mnt/shared-storage-user/ailab-llmkernel/huangzixian/miniconda3/envs/ykc-codejudge"  # vllm
+CONDA_ENV_PATH="/mnt/shared-storage-user/ailab-llmkernel/huangzixian/miniconda3/envs/ykc-rewardapi-sglang" # sglang
 # 或者如果是 reference 里的 hzx:
 # CONDA_ENV_PATH="/mnt/shared-storage-user/yuanfei/miniconda3/envs/hzx"
 
@@ -28,6 +35,10 @@ CONDA_ENV_PATH="/mnt/shared-storage-user/ailab-llmkernel/huangzixian/miniconda3/
 HOST="0.0.0.0"
 PORT=23334
 SERVICE_NAME="reward-server-qwen8b"
+
+# 显式导出给 Python，避免系统 HOST 环境变量污染监听地址
+export APP_HOST="${APP_HOST:-$HOST}"
+export APP_PORT="${APP_PORT:-$PORT}"
 
 # ============================================================
 
@@ -88,7 +99,7 @@ LOG_FILE="logs/service_${SERVICE_NAME}_$(date +%Y%m%d_%H%M%S).log"
 echo "正在启动 Python 服务... 日志将写入 $LOG_FILE"
 echo "注意：初次启动需要加载模型权重，可能需要 1-3 分钟，请耐心等待..."
 
-# 使用 uvicorn 启动，workers 必须为 1 (因为 vLLM 独占 GPU)
+# 使用 uvicorn 启动，workers 必须为 1 (vLLM/SGLang 独占 GPU)
 nohup python -m app.main > "$LOG_FILE" 2>&1 &
 
 SERVER_PID=$!

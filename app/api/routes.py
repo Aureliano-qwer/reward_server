@@ -7,7 +7,7 @@ from app.services.scorer import ScorerService
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-scorer_service = ScorerService()
+scorer_service = None
 
 # 建议保留 /get_reward2 或改成更通用的 /compute_score
 # 只要 Client 端的 url 配置对就行
@@ -16,6 +16,10 @@ async def get_reward_endpoint(request: RewardRequest):
     """
     对应 Verl Client 的调用
     """
+    global scorer_service
+    if scorer_service is None:
+        scorer_service = ScorerService()
+
     # 1. 计算
     result = await scorer_service.calculate(request)
     

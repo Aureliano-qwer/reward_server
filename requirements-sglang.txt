@@ -1,0 +1,4 @@
+# 使用 INFERENCE_BACKEND=sglang 时需安装
+# pip install -r requirements-sglang.txt
+# 根据 CUDA 版本选择: sglang[cu118] / sglang[cu121] / sglang[cu124]
+sglang[cu121]

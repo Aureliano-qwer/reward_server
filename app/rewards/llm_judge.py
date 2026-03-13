@@ -1,7 +1,12 @@
-from vllm.sampling_params import SamplingParams
-from vllm.utils import random_uuid
+import uuid
+
 from app.core.engine import LLMEngineManager
 from app.rewards.base import BaseReward
+
+
+def _request_id() -> str:
+    return uuid.uuid4().hex
+
 
 class QwenJudgeReward(BaseReward):
     def __init__(self):
@@ -39,21 +44,17 @@ Finally, output the score in a `<score>` tag:
 {response}
 """
         judge_prompt = build_prompt(system_prompt, user_prompt, enable_think=True, name="qwen")
-        # 确定性采样
-        sampling_params = SamplingParams(
-            temperature=0.0, 
-            max_tokens=4096, 
-            stop=["<|im_end|>"])
-        request_id = random_uuid()
-
-        # 调用 vLLM 引擎
-        results_generator = self.engine.generate(judge_prompt, sampling_params, request_id)
-        print("results_generator: ", results_generator)
+        sampling_params = {
+            "temperature": 0.0,
+            "max_new_tokens": 4096,
+            "stop": ["<|im_end|>"],
+        }
+        request_id = _request_id()
 
         final_output = ""
-        async for request_output in results_generator:
-            if request_output.finished:
-                final_output = request_output.outputs[0].text
+        async for chunk in self.engine.generate(judge_prompt, sampling_params, request_id):
+            if chunk.get("finished"):
+                final_output = chunk.get("text", "")
 
         # 解析结果
         if "[[1]]" in final_output:
@@ -485,33 +486,28 @@ Output strictly one tag based on the criteria below.
             name="gpt"
         )
 
-        # 4. 采样参数
-        sampling_params = SamplingParams(
-            temperature=0.2,       
-            max_tokens=8192,       
-            stop=["<|end|>"]       
-        )
-        
-        request_id = random_uuid()
+        sampling_params = {
+            "temperature": 0.2,
+            "max_new_tokens": 8192,
+            "stop": ["<|end|>"],
+        }
+        request_id = _request_id()
 
         try:
-            # 5. 执行推理
-            results_generator = self.engine.generate(final_prompt, sampling_params, request_id)
-            
             final_output = ""
             finish_reason = None
 
-            async for request_output in results_generator:
-                if request_output.finished:
-                    output_obj = request_output.outputs[0]
-                    final_output = output_obj.text
-                    finish_reason = output_obj.finish_reason
+            async for chunk in self.engine.generate(final_prompt, sampling_params, request_id):
+                if chunk.get("finished"):
+                    final_output = chunk.get("text", "")
+                    finish_reason = chunk.get("finish_reason")
 
             # === [截断检测逻辑] ===
+            max_tokens = sampling_params.get("max_new_tokens", 8192)
             if finish_reason == "length":
                 print(f"\n{'='*20} ⚠️ DETECTED TRUNCATION ⚠️ {'='*20}")
                 print(f"Req ID: {request_id}")
-                print(f"Reason: Max tokens ({sampling_params.max_tokens}) reached.")
+                print(f"Reason: Max tokens ({max_tokens}) reached.")
                 print(f"Generated Content (Last 200 chars): ...{final_output[-200:]!r}")
                 print(f"{'='*60}\n")
                 return 0.0, final_output
