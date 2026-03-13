@@ -48,4 +48,7 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=settings.HOST, port=settings.PORT)
+    host = settings.APP_HOST if settings.APP_HOST is not None else settings.HOST
+    port = settings.APP_PORT if settings.APP_PORT is not None else settings.PORT
+    logger.info("Binding to %s:%s", host, port)
+    uvicorn.run(app, host=host, port=port)

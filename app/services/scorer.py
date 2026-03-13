@@ -15,9 +15,15 @@ class ScorerService:
     def __init__(self):
         # self.fmt_reward = FormatReward()
         self.acc_reward = AccuracyReward()
-        self.llm_reward = GptOssJudgeReward() # QwenJudgeReward()
+        self.llm_reward = None
         self.legacy_rule = LegacyRuleReward()
         self.strict_rule = StrictRuleReward()
+
+    def _get_llm_reward(self):
+        if self.llm_reward is None:
+            # 懒加载 LLM Judge，避免模块导入阶段触发多进程初始化
+            self.llm_reward = GptOssJudgeReward()  # QwenJudgeReward()
+        return self.llm_reward
 
     async def calculate(self, req: RewardRequest) -> RewardResponse:
         # 0. 计时与计数开始
@@ -62,7 +68,8 @@ class ScorerService:
                 
                 # === [新增] 旁路执行 LLM Judge (仅用于记录打点，不参与最终计分) ===
                 t_llm_start = time.time()
-                score, reasoning = await self.llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
+                llm_reward = self._get_llm_reward()
+                score, reasoning = await llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
                 t_llm_cost = time.time() - t_llm_start
                 
                 logger.info(f"🤖 [Req {req_id}] [TEST] LLM Finish | Cost: {t_llm_cost:.4f}s | Score: {score}")
@@ -107,7 +114,8 @@ class ScorerService:
                 
                 # 关键点：这里是 await，让出控制权。
                 # 如果 vLLM 是并行的，这里应该会有多个请求同时处于 await 状态。
-                score, reasoning = await self.llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
+                llm_reward = self._get_llm_reward()
+                score, reasoning = await llm_reward.compute(req.prompt_str, req.response_str, ground_truth_str, extra_info)
 
 
                 # TODO：加个负分机制
